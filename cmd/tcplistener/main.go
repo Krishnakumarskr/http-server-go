@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"http-server/internal/request"
 	"io"
 	"log"
 	"net"
@@ -54,8 +55,16 @@ func main() {
 			log.Fatal("Error in accepting connection")
 		}
 
-		for line := range getLinesChannel(conn) {
-			fmt.Printf("read: %s\n", line)
+		req, err := request.RequestFromReader(conn)
+
+		if err != nil {
+			log.Fatalf("Error in reading request %+v", err)
 		}
+
+		fmt.Printf("Request Line:\n- Method: %s\n- Target: %s\n- Version: %s", req.RequestLine.Method, req.RequestLine.RequestTarget, req.RequestLine.HttpVersion)
+		fmt.Printf("\nHeaders:\n")
+		req.Headers.ForEach(func(name, val string) {
+			fmt.Printf("-%s: %s\n", name, val)
+		})
 	}
 }
