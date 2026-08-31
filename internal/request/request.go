@@ -6,11 +6,13 @@ import (
 	"http-server/internal/headers"
 	"io"
 	"log/slog"
+	"strconv"
 )
 
 type Request struct {
 	RequestLine RequestLine
 	Headers     *headers.Headers
+	Body        []byte
 	state       parseState
 }
 
@@ -28,6 +30,7 @@ type parseState string
 var StateInit parseState = "init"
 var StateDone parseState = "done"
 var StateHeaders parseState = "headers"
+var StateBody parseState = "body"
 
 func newRequest() *Request {
 	return &Request{
@@ -98,12 +101,44 @@ outer:
 				read += n
 
 				if done {
-					r.state = StateDone
+					r.state = StateBody
 				}
 
 				if n == 0 {
 					break outer
 				}
+			}
+		case StateBody:
+			{
+				val := r.Headers.Get("Content-Length")
+				if val == "" {
+					r.state = StateDone
+					break outer
+				}
+
+				cLen, err := strconv.Atoi(val)
+				if err != nil {
+					return 0, fmt.Errorf("Error in converting string to intger content length: %+v", err)
+				}
+
+				if len(currentData) == 0 {
+					break outer
+				}
+
+				remaining := min(cLen-len(r.Body), len(currentData))
+
+				r.Body = append(r.Body, currentData[:remaining]...)
+				read += len(currentData[:remaining])
+
+				if len(r.Body) == cLen {
+					r.state = StateDone
+					break outer
+				}
+
+				if len(currentData) > 0 {
+					break outer
+				}
+
 			}
 		case StateDone:
 			{
@@ -143,7 +178,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		}
 		copy(buf, buf[readN:bufLen])
 		bufLen -= readN
-
 	}
 
 	return request, nil

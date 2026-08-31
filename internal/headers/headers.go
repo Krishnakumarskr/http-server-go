@@ -86,6 +86,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 		if n == 0 {
 			done = true
+			read += len(crlf)
 			break
 		}
 
