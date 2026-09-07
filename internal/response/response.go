@@ -9,6 +9,16 @@ import (
 type Response struct {
 }
 
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{
+		writer: w,
+	}
+}
+
+type Writer struct {
+	writer io.Writer
+}
+
 type StatusCode uint16
 
 const Success StatusCode = 200
@@ -25,7 +35,7 @@ func GetDefaultHeaders(contentLen int) *headers.Headers {
 	return h
 }
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
 	statusMsg := []byte{}
 
 	switch statusCode {
@@ -47,18 +57,24 @@ func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 		}
 	}
 
-	_, err := w.Write(statusMsg)
+	_, err := w.writer.Write(statusMsg)
 
 	return err
 }
 
-func WriteHeaders(w io.Writer, headers *headers.Headers) error {
+func (w *Writer) WriteHeaders(h headers.Headers) error {
 	b := []byte{}
 
-	headers.ForEach(func(k, v string) {
+	h.ForEach(func(k, v string) {
 		b = fmt.Appendf(b, "%s: %s\r\n", k, v)
 	})
 	b = fmt.Appendf(b, "\r\n")
-	_, err := w.Write(b)
+	_, err := w.writer.Write(b)
 	return err
+}
+
+func (w *Writer) WriteBody(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+
+	return n, err
 }

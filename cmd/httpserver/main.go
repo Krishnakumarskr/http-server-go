@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"http-server/internal/request"
 	"http-server/internal/response"
 	"http-server/internal/server"
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -13,23 +13,63 @@ import (
 
 const port = 42069
 
+func respond200() []byte {
+	return []byte(`<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>`)
+}
+
+func respond400() []byte {
+	return []byte(`<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>`)
+}
+
+func respond500() []byte {
+	return []byte(`<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Internal Server Error</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>`)
+}
+
 func main() {
-	server, err := server.Serve(port, func(w io.Writer, req *request.Request) *server.HandlerError {
+	server, err := server.Serve(port, func(w *response.Writer, req *request.Request) {
+		h := response.GetDefaultHeaders(0)
+		body := respond200()
+		status := response.Success
 		if req.RequestLine.RequestTarget == "/yourproblem" {
-			return &server.HandlerError{
-				StatusCode: response.BadRequest,
-				Message:    "your problem is not my problem\n",
-			}
+			body = respond400()
+			status = response.BadRequest
 		} else if req.RequestLine.RequestTarget == "/myproblem" {
-			return &server.HandlerError{
-				StatusCode: response.InternalError,
-				Message:    "Woopsie, My Bad!\n",
-			}
+			body = respond500()
+			status = response.InternalError
 		} else {
-			w.Write([]byte("All good for real\n"))
+
 		}
 
-		return nil
+		h.Replace("content-length", fmt.Sprintf("%d", len(body)))
+		h.Replace("Content-type", "text/html")
+		w.WriteStatusLine(status)
+		w.WriteHeaders(*h)
+		w.WriteBody(body)
+
 	})
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
